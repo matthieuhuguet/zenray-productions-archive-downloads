@@ -1,0 +1,327 @@
+#!/usr/bin/env python3
+
+from __future__ import annotations
+
+import json
+import shutil
+import subprocess
+import tempfile
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+from pathlib import Path
+
+from PIL import Image, ImageDraw, ImageFont
+
+
+# Updated 2026-09-14 13:05 CEST: render comparable mixed and Sectra-only title variants.
+@dataclass(frozen=True)
+class RenderConfig:
+    project_dir: Path = Path("/Users/zenray/Downloads/tmp-3D-houdini")
+    input_video_name: str = "short-materials-layers.mp4"
+    width: int = 1080
+    height: int = 1920
+    frame_rate: int = 60
+    title_font_size: int = 66
+    title_baseline_y: int = 330
+    title_space: int = 18
+    title_clear_top: int = 220
+    title_clear_bottom: int = 410
+    stroke_width: int = 4
+    mono_shear: float = 0.22
+    video_bitrate: str = "12M"
+
+    @property
+    def input_video(self) -> Path:
+        return self.project_dir / self.input_video_name
+
+    @property
+    def preview_dir(self) -> Path:
+        return self.project_dir / "previews"
+
+
+@dataclass(frozen=True)
+class TitleVariant:
+    name: str
+    font_keys: tuple[str, str, str]
+    output_name: str
+    preview_name: str
+
+
+CONFIG = RenderConfig()
+FONT_PATHS = {
+    "sectra": Path("/Users/zenray/Library/Fonts/GT-Sectra-LCGV-Bold-Italic.otf"),
+    "inter": Path("/Users/zenray/Library/Fonts/InterTight-Italic-VariableFont_wght.ttf"),
+    "mono": Path("/Users/zenray/Library/Fonts/AnthropicMono-Bold.ttf"),
+}
+TITLE_WORDS = ("Houdini", "Procedural", "Texturing")
+TITLE_VARIANTS = (
+    TitleVariant(
+        name="random",
+        font_keys=("sectra", "inter", "mono"),
+        output_name="short-materials-layers-title-random.mp4",
+        preview_name="short-materials-layers-title-random.jpg",
+    ),
+    TitleVariant(
+        name="sectra-only",
+        font_keys=("sectra", "sectra", "sectra"),
+        output_name="short-materials-layers-title-sectra-only.mp4",
+        preview_name="short-materials-layers-title-sectra-only.jpg",
+    ),
+)
+
+
+def require_inputs() -> None:
+    required_paths = [CONFIG.input_video, *FONT_PATHS.values()]
+    missing_paths = [str(path) for path in required_paths if not path.is_file()]
+    if missing_paths:
+        raise FileNotFoundError(f"Missing required files: {missing_paths}")
+    for command in ("ffmpeg", "ffprobe"):
+        if shutil.which(command) is None:
+            raise FileNotFoundError(f"Missing command: {command}")
+
+
+def load_fonts() -> dict[str, ImageFont.FreeTypeFont]:
+    fonts = {
+        key: ImageFont.truetype(str(path), CONFIG.title_font_size)
+        for key, path in FONT_PATHS.items()
+    }
+    fonts["inter"].set_variation_by_axes([700])
+    return fonts
+
+
+def draw_slanted_mono_word(
+    overlay: Image.Image,
+    word: str,
+    font: ImageFont.FreeTypeFont,
+    x: float,
+) -> None:
+    width = font.getlength(word)
+    ascent, descent = font.getmetrics()
+    patch_width = int(width + 60)
+    patch_height = int(ascent + descent + 20)
+    patch = Image.new("RGBA", (patch_width, patch_height), (0, 0, 0, 0))
+    patch_draw = ImageDraw.Draw(patch)
+    origin_x = 10
+    patch_draw.text(
+        (origin_x, ascent),
+        word,
+        font=font,
+        fill=(255, 255, 255),
+        stroke_width=CONFIG.stroke_width,
+        stroke_fill=(0, 0, 0),
+        anchor="ls",
+    )
+    matrix = (
+        1,
+        CONFIG.mono_shear,
+        -CONFIG.mono_shear * ascent,
+        0,
+        1,
+        0,
+    )
+    slanted = patch.transform(
+        (patch_width, patch_height),
+        Image.Transform.AFFINE,
+        matrix,
+        resample=Image.Resampling.BICUBIC,
+    )
+    paste_position = (
+        int(x - origin_x),
+        int(CONFIG.title_baseline_y - ascent),
+    )
+    overlay.paste(slanted, paste_position, slanted)
+
+
+def render_title_overlay(
+    variant: TitleVariant,
+    output_path: Path,
+) -> None:
+    fonts = load_fonts()
+    selected_fonts = [fonts[key] for key in variant.font_keys]
+    widths = [
+        font.getlength(word)
+        for word, font in zip(TITLE_WORDS, selected_fonts)
+    ]
+    total_width = sum(widths) + CONFIG.title_space * (len(TITLE_WORDS) - 1)
+    current_x = (CONFIG.width - total_width) / 2
+
+    overlay = Image.new(
+        "RGBA",
+        (CONFIG.width, CONFIG.height),
+        (0, 0, 0, 0),
+    )
+    draw = ImageDraw.Draw(overlay)
+    draw.rectangle(
+        (0, CONFIG.title_clear_top, CONFIG.width, CONFIG.title_clear_bottom),
+        fill=(0, 0, 0, 255),
+    )
+
+    for word, font_key, font, width in zip(
+        TITLE_WORDS,
+        variant.font_keys,
+        selected_fonts,
+        widths,
+    ):
+        if font_key == "mono":
+            draw_slanted_mono_word(overlay, word, font, current_x)
+        else:
+            draw.text(
+                (current_x, CONFIG.title_baseline_y),
+                word,
+                font=font,
+                fill=(255, 255, 255),
+                stroke_width=CONFIG.stroke_width,
+                stroke_fill=(0, 0, 0),
+                anchor="ls",
+            )
+        current_x += width + CONFIG.title_space
+
+    overlay.save(output_path)
+
+
+def run_checked(command: list[str]) -> None:
+    result = subprocess.run(
+        command,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode != 0:
+        error_tail = "\n".join(result.stderr.splitlines()[-30:])
+        raise RuntimeError(f"Command failed: {command[0]}\n{error_tail}")
+
+
+def verify_video(output_path: Path) -> dict[str, object]:
+    result = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration,size",
+            "-show_entries",
+            "stream=codec_type,codec_name,width,height,r_frame_rate",
+            "-of",
+            "json",
+            str(output_path),
+        ],
+        check=True,
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    metadata = json.loads(result.stdout)
+    duration = float(metadata["format"]["duration"])
+    video_streams = [
+        stream for stream in metadata["streams"] if stream["codec_type"] == "video"
+    ]
+    audio_streams = [
+        stream for stream in metadata["streams"] if stream["codec_type"] == "audio"
+    ]
+    if abs(duration - 18.0) > 0.05:
+        raise RuntimeError(f"Unexpected duration for {output_path}: {duration}")
+    if len(video_streams) != 1 or len(audio_streams) != 1:
+        raise RuntimeError(f"Unexpected stream count for {output_path}")
+    video_stream = video_streams[0]
+    if (
+        video_stream.get("width") != CONFIG.width
+        or video_stream.get("height") != CONFIG.height
+        or video_stream.get("r_frame_rate") != "60/1"
+    ):
+        raise RuntimeError(f"Unexpected video geometry for {output_path}: {video_stream}")
+    return {
+        "path": str(output_path),
+        "duration": duration,
+        "size": int(metadata["format"]["size"]),
+        "video_codec": video_stream["codec_name"],
+        "audio_codec": audio_streams[0]["codec_name"],
+    }
+
+
+def render_variant(
+    variant: TitleVariant,
+    overlay_path: Path,
+) -> dict[str, object]:
+    output_path = CONFIG.project_dir / variant.output_name
+    preview_path = CONFIG.preview_dir / variant.preview_name
+    run_checked(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(CONFIG.input_video),
+            "-loop",
+            "1",
+            "-framerate",
+            str(CONFIG.frame_rate),
+            "-i",
+            str(overlay_path),
+            "-filter_complex",
+            "[0:v][1:v]overlay=0:0:eof_action=repeat:shortest=1[v]",
+            "-map",
+            "[v]",
+            "-map",
+            "0:a?",
+            "-c:v",
+            "h264_videotoolbox",
+            "-b:v",
+            CONFIG.video_bitrate,
+            "-maxrate",
+            "16M",
+            "-bufsize",
+            "24M",
+            "-pix_fmt",
+            "yuv420p",
+            "-tag:v",
+            "avc1",
+            "-c:a",
+            "copy",
+            "-movflags",
+            "+faststart",
+            str(output_path),
+        ]
+    )
+    run_checked(
+        [
+            "ffmpeg",
+            "-y",
+            "-ss",
+            "00:00:01",
+            "-i",
+            str(output_path),
+            "-frames:v",
+            "1",
+            "-q:v",
+            "2",
+            str(preview_path),
+        ]
+    )
+    verification = verify_video(output_path)
+    verification["variant"] = variant.name
+    verification["preview"] = str(preview_path)
+    return verification
+
+
+def main() -> None:
+    require_inputs()
+    CONFIG.preview_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="zenray-title-variants-") as temporary_dir:
+        temporary_path = Path(temporary_dir)
+        overlay_paths: dict[str, Path] = {}
+        for variant in TITLE_VARIANTS:
+            overlay_path = temporary_path / f"{variant.name}.png"
+            render_title_overlay(variant, overlay_path)
+            overlay_paths[variant.name] = overlay_path
+
+        with ThreadPoolExecutor(max_workers=len(TITLE_VARIANTS)) as executor:
+            futures = [
+                executor.submit(render_variant, variant, overlay_paths[variant.name])
+                for variant in TITLE_VARIANTS
+            ]
+            results = [future.result() for future in futures]
+
+    print(json.dumps(results, indent=2))
+
+
+if __name__ == "__main__":
+    main()
