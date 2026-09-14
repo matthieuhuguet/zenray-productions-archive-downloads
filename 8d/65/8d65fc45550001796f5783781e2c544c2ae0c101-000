@@ -1,0 +1,341 @@
+import os, sys, subprocess, random, math, time
+from PIL import Image, ImageDraw, ImageFont
+
+W, H = 2160, 3840
+FPS = 60
+TOTAL_FRAMES = 1680 # 28.00s exact at 60 fps
+CUE_FRAMES = 168    # 2.80s per cue (10 cues)
+CANON_DELAY = 36   # 0.60s delay for Line 2
+
+font_dir = os.path.expanduser('~/Library/Fonts')
+p_sectra_bold_italic = os.path.join(font_dir, 'GT-Sectra-LCGV-Bold-Italic.otf')
+p_inter = os.path.join(font_dir, 'InterTight-Italic-VariableFont_wght.ttf')
+p_garamond = os.path.join(font_dir, 'ArchiveGaramondStd-BoldItalic.ttf')
+p_mono = os.path.join(font_dir, 'AnthropicMono-Bold.ttf')
+p_euphemia = '/System/Library/Fonts/Supplemental/EuphemiaCAS.ttc'
+p_arial = '/System/Library/Fonts/Supplemental/Arial Unicode.ttf'
+
+# Colors
+SUBTITLE_YELLOW = (241, 242, 80) # #f1f250
+
+# 1. Master Title setup (pre-rendered on static RGBA canvas)
+title_text = 'Houdini Procedural Texturing'
+title_reference_font_size = 132
+title_reference_stroke_width = 8
+title_baseline_y = 660
+title_safe_margin_x = 64
+title_safe_top = 440
+title_safe_bottom = 820
+title_max_font_size = 400
+shear = 0.22
+
+title_layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+t_draw = ImageDraw.Draw(title_layer)
+
+for title_font_size in range(title_max_font_size, 9, -1):
+    title_stroke_width = max(1, round(title_font_size * title_reference_stroke_width / title_reference_font_size))
+    title_font = ImageFont.truetype(p_sectra_bold_italic, title_font_size)
+    title_bbox = t_draw.textbbox((0, title_baseline_y), title_text, font=title_font, stroke_width=title_stroke_width, anchor='ls')
+    title_bbox_width = title_bbox[2] - title_bbox[0]
+    title_fits = (
+        title_bbox_width <= W - 2 * title_safe_margin_x
+        and title_bbox[1] >= title_safe_top
+        and title_bbox[3] <= title_safe_bottom
+    )
+    if title_fits:
+        title_tx = (W - title_bbox_width) / 2 - title_bbox[0]
+        break
+else:
+    raise ValueError('Sectra title cannot fit inside configured safe area')
+
+t_draw.text((title_tx, title_baseline_y), title_text, font=title_font, fill=(255, 255, 255), stroke_width=title_stroke_width, stroke_fill=(0, 0, 0), anchor='ls')
+
+# 2. Subtitles: 10 cues in 2 lines, randomized fonts (Garamond x1.25) & canon line-by-line
+cues_2lines = [
+    [
+        'Today I focused on UV texel harmony',
+        'across the whole church.'
+    ],
+    [
+        'The problem was simple: from one pattern',
+        'to the next, my UVs had no global harmony.'
+    ],
+    [
+        'So I took my height map,',
+        'which already gave me a clear pattern,'
+    ],
+    [
+        'and pushed it into the base color',
+        'just to get a proper debug view.'
+    ],
+    [
+        'Instead of patching things by hand,',
+        'I set one global texel density.'
+    ],
+    [
+        'Everything is computed properly now,',
+        'the whole building shares one scale.'
+    ],
+    [
+        'Any tiling texture can go on top,',
+        'and the parameters stay editable.'
+    ],
+    [
+        'Here is an extract of the UVs on the geo,',
+        'and a second one with the full materials.'
+    ],
+    [
+        'Some details can still be improved, the windows mostly,',
+        'where a few UVs stay slightly stretched.'
+    ],
+    [
+        'thanks for watching, follow,',
+        'like for more! ᕙ(`▿´)ᕗ'
+    ]
+]
+
+MAX_W = 1920
+space_sub = 32
+c1 = (1080, 3060)
+c2 = (1080, 3260)
+subtitle_stroke_width = 8
+
+punch_curve = [
+    (0.50, 0.0),
+    (0.68, 0.4),
+    (0.85, 0.7),
+    (1.02, 1.0),
+    (1.14, 1.0),
+    (1.18, 1.0), # peak punch
+    (1.16, 1.0),
+    (1.11, 1.0),
+    (1.05, 1.0),
+    (0.99, 1.0),
+    (0.96, 1.0),
+    (0.97, 1.0),
+    (0.99, 1.0),
+    (1.01, 1.0),
+    (1.00, 1.0)
+]
+
+def render_line_card(line, font_size, cue_idx, line_idx):
+    f_i = ImageFont.truetype(p_inter, font_size)
+    f_i.set_variation_by_axes([700])
+    
+    # Scale Garamond by 1.25 for optical volume harmony with Inter and Mono
+    f_g = ImageFont.truetype(p_garamond, int(round(font_size * 1.25)))
+    f_m = ImageFont.truetype(p_mono, int(font_size * 0.95))
+    f_euphemia = ImageFont.truetype(p_euphemia, int(font_size * 0.95))
+    f_arial = ImageFont.truetype(p_arial, int(font_size * 0.90))
+    pool = [f_i, f_g, f_m]
+    
+    rng = random.Random(cue_idx * 1337 + 42 + line_idx * 99)
+    last_idx = -1
+    
+    words = line.split(' ')
+    w_info = []
+    
+    for w in words:
+        if 'ᕙ' in w or 'ᕗ' in w or '▿' in w:
+            # Kaomoji exception: strictly Mono base + fallback glyphs to prevent missing glyph tofu
+            char_items = []
+            for ch in w:
+                if ch in ['ᕙ', 'ᕗ']:
+                    cf = f_euphemia
+                    y_off = int(font_size * 0.05)
+                elif ch in ['▿']:
+                    cf = f_arial
+                    y_off = 0
+                else:
+                    cf = f_m
+                    y_off = 0
+                cw = cf.getlength(ch)
+                char_items.append((ch, cf, cw, y_off))
+            w_len = sum(item[2] for item in char_items)
+            w_info.append({'type': 'kaomoji', 'chars': char_items, 'width': w_len})
+        else:
+            choices = [i for i in range(len(pool)) if i != last_idx]
+            last_idx = rng.choice(choices)
+            chosen_font = pool[last_idx]
+            imono = (chosen_font == f_m)
+            w_len = chosen_font.getlength(w)
+            w_info.append({'type': 'word', 'word': w, 'font': chosen_font, 'width': w_len, 'is_mono': imono})
+        
+    total_w = sum(item['width'] for item in w_info) + space_sub * (len(words) - 1)
+    im_w = int(total_w + 140)
+    im_h = int(font_size * 1.6 + 60)
+    
+    im = Image.new('RGBA', (im_w, im_h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    
+    cur_x = 40
+    base_y = int(font_size * 1.1 + 20)
+    
+    for item in w_info:
+        if item['type'] == 'kaomoji':
+            for ch, cf, cw, y_off in item['chars']:
+                d.text((cur_x, base_y - y_off), ch, font=cf, fill=SUBTITLE_YELLOW, stroke_width=subtitle_stroke_width, stroke_fill=(0, 0, 0), anchor='ls')
+                cur_x += cw
+            cur_x += space_sub
+        else:
+            w = item['word']
+            f = item['font']
+            width = item['width']
+            if item['is_mono']:
+                asc, desc = f.getmetrics()
+                bw = int(width + 160)
+                bh = int(asc + desc + 60)
+                pp = Image.new('RGBA', (bw, bh), (0, 0, 0, 0))
+                pd = ImageDraw.Draw(pp)
+                mono_origin_x = 30
+                pd.text((mono_origin_x, asc), w, font=f, fill=SUBTITLE_YELLOW, stroke_width=subtitle_stroke_width, stroke_fill=(0, 0, 0), anchor='ls')
+                m = (1, shear, -shear * asc, 0, 1, 0)
+                sl = pp.transform((bw, bh), Image.AFFINE, m, resample=Image.BICUBIC)
+                im.paste(sl, (int(cur_x - mono_origin_x), int(base_y - asc)), sl)
+            else:
+                d.text((cur_x, base_y), w, font=f, fill=SUBTITLE_YELLOW, stroke_width=subtitle_stroke_width, stroke_fill=(0, 0, 0), anchor='ls')
+            cur_x += width + space_sub
+        
+    return im, im_w, im_h
+
+# Pre-render cues for canon line-by-line
+rendered_cues = []
+for c_idx, cue in enumerate(cues_2lines):
+    best_size = 80
+    for test_size in range(120, 56, -1):
+        f_test = ImageFont.truetype(p_inter, test_size)
+        f_test.set_variation_by_axes([700])
+        all_fit = True
+        for line in cue:
+            words = line.split(' ')
+            total_len = sum(f_test.getlength(w) for w in words) + space_sub * (len(words) - 1)
+            if total_len > MAX_W:
+                all_fit = False
+                break
+        if all_fit:
+            best_size = test_size
+            break
+            
+    c_data = {}
+    for l_idx, (line, center_pos) in enumerate(zip(cue, [c1, c2])):
+        card, cw, ch = render_line_card(line, best_size, c_idx, l_idx)
+        frames = []
+        for s, a in punch_curve:
+            if a <= 0.0:
+                frames.append(None)
+                continue
+            nw = max(1, int(cw * s))
+            nh = max(1, int(ch * s))
+            scaled = card.resize((nw, nh), resample=Image.BICUBIC)
+            if a < 1.0:
+                alpha = scaled.split()[3]
+                alpha = alpha.point(lambda p: int(p * a))
+                scaled.putalpha(alpha)
+            px = center_pos[0] - nw // 2
+            py = center_pos[1] - nh // 2
+            frames.append((scaled, px, py))
+            
+        steady = (card, center_pos[0] - cw // 2, center_pos[1] - ch // 2)
+        c_data[f'l{l_idx+1}_frames'] = frames
+        c_data[f'l{l_idx+1}_steady'] = steady
+        
+    rendered_cues.append(c_data)
+
+# 3. Pipelines FFmpeg (Writing strictly to copies/ folder)
+src_video = '/Users/zenray/Downloads/tmp-3D-houdini/tmp-shorts/raw/spedup_28s.mkv'
+music = '/Users/zenray/Downloads/tmp-3D-houdini/tmp-shorts/audio/kinematica_28s.m4a'
+out_mov = '/Users/zenray/Downloads/tmp-3D-houdini/tmp-shorts/copies/short-uv-texel-harmony-f1f250-kaomoji.mov'
+out_mp4 = '/Users/zenray/Downloads/tmp-3D-houdini/tmp-shorts/copies/mp4/short-uv-texel-harmony-f1f250-kaomoji.mp4'
+
+in_cmd = [
+    'ffmpeg', '-y',
+    '-i', src_video,
+    '-vf', f'fps=60,scale={W}:1396:flags=lanczos,pad={W}:{H}:0:1222:color=black',
+    '-pix_fmt', 'rgb24', '-f', 'rawvideo', 'pipe:1'
+]
+
+enc_cmd = [
+    'ffmpeg', '-y',
+    '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}', '-r', '60', '-i', 'pipe:0',
+    '-i', music,
+    '-c:v', 'h264_videotoolbox', '-b:v', '45M', '-pix_fmt', 'yuv420p',
+    '-c:a', 'aac', '-b:a', '320k', '-ar', '48000',
+    '-shortest', out_mov
+]
+
+p_in = subprocess.Popen(in_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+p_out = subprocess.Popen(enc_cmd, stdin=subprocess.PIPE)
+
+bytes_per_frame = W * H * 3
+print(f'Compositing copy short {TOTAL_FRAMES} frames (28.00s) at 4K 2160x3840 60fps with yellow #f1f250...')
+
+t_start = time.time()
+for frame_idx in range(TOTAL_FRAMES):
+    raw = p_in.stdout.read(bytes_per_frame)
+    if len(raw) < bytes_per_frame:
+        base_frame = Image.new('RGB', (W, H), (0, 0, 0))
+    else:
+        base_frame = Image.frombytes('RGB', (W, H), raw)
+        
+    # Title paste
+    base_frame.paste(title_layer, (0, 0), title_layer)
+    
+    # Subtitles in canon
+    cue_idx = frame_idx // CUE_FRAMES
+    cue_idx = min(cue_idx, len(rendered_cues) - 1)
+    f_rel = frame_idx % CUE_FRAMES
+    cdata = rendered_cues[cue_idx]
+    
+    # Line 1
+    if f_rel < len(cdata['l1_frames']):
+        part1 = cdata['l1_frames'][f_rel]
+    else:
+        part1 = cdata['l1_steady']
+    if part1 is not None:
+        im1, px1, py1 = part1
+        base_frame.paste(im1, (px1, py1), im1)
+        
+    # Line 2 (canon delay)
+    if f_rel >= CANON_DELAY:
+        k = f_rel - CANON_DELAY
+        if k < len(cdata['l2_frames']):
+            part2 = cdata['l2_frames'][k]
+        else:
+            part2 = cdata['l2_steady']
+        if part2 is not None:
+            im2, px2, py2 = part2
+            base_frame.paste(im2, (px2, py2), im2)
+            
+    p_out.stdin.write(base_frame.tobytes())
+    
+    if (frame_idx + 1) % 240 == 0:
+        elapsed = time.time() - t_start
+        fps_proc = (frame_idx + 1) / elapsed
+        print(f'Frame {frame_idx+1}/{TOTAL_FRAMES} ({fps_proc:.1f} fps)...')
+
+p_out.stdin.close()
+p_out.wait()
+p_in.stdout.close()
+p_in.wait()
+
+print('Master QuickTime MOV completed in copies.')
+
+# Web MP4 with faststart
+print('Encoding MP4 faststart...')
+subprocess.run([
+    'ffmpeg', '-y', '-i', out_mov,
+    '-c:v', 'copy', '-c:a', 'copy',
+    '-movflags', '+faststart', out_mp4
+], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+# Thumbnails
+thumb_dir = '/Users/zenray/Downloads/tmp-3D-houdini/tmp-shorts/copies/thumbnails'
+t_4k_jpg = os.path.join(thumb_dir, 'thumbnail-uv-texel-harmony-f1f250-4k.jpg')
+t_4k_png = os.path.join(thumb_dir, 'thumbnail-uv-texel-harmony-f1f250-4k.png')
+t_1080_jpg = os.path.join(thumb_dir, 'thumbnail-uv-texel-harmony-f1f250-1080x1920.jpg')
+
+subprocess.run(['ffmpeg', '-y', '-ss', '00:00:12.5', '-i', out_mov, '-vframes', '1', '-q:v', '2', t_4k_jpg], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+subprocess.run(['ffmpeg', '-y', '-ss', '00:00:12.5', '-i', out_mov, '-vframes', '1', t_4k_png], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+subprocess.run(['ffmpeg', '-y', '-ss', '00:00:12.5', '-i', out_mov, '-vframes', '1', '-vf', 'scale=1080:1920:flags=lanczos', '-q:v', '2', t_1080_jpg], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+print('Done! Copy generated successfully without touching original short.')
