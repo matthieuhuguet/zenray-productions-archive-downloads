@@ -13,7 +13,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 
-# Updated 2026-09-14 13:05 CEST: render comparable mixed and Sectra-only title variants.
+# Updated 2026-09-14 13:34 CEST: Sectra-only auto-fits to the largest safe uncropped size.
 @dataclass(frozen=True)
 class RenderConfig:
     project_dir: Path = Path("/Users/zenray/Downloads/tmp-3D-houdini")
@@ -22,6 +22,8 @@ class RenderConfig:
     height: int = 1920
     frame_rate: int = 60
     title_font_size: int = 66
+    title_max_font_size: int = 200
+    title_safe_margin_x: int = 32
     title_baseline_y: int = 330
     title_space: int = 18
     title_clear_top: int = 220
@@ -80,9 +82,10 @@ def require_inputs() -> None:
             raise FileNotFoundError(f"Missing command: {command}")
 
 
-def load_fonts() -> dict[str, ImageFont.FreeTypeFont]:
+def load_fonts(font_size: int | None = None) -> dict[str, ImageFont.FreeTypeFont]:
+    resolved_font_size = font_size or CONFIG.title_font_size
     fonts = {
-        key: ImageFont.truetype(str(path), CONFIG.title_font_size)
+        key: ImageFont.truetype(str(path), resolved_font_size)
         for key, path in FONT_PATHS.items()
     }
     fonts["inter"].set_variation_by_axes([700])
@@ -136,14 +139,41 @@ def render_title_overlay(
     variant: TitleVariant,
     output_path: Path,
 ) -> None:
-    fonts = load_fonts()
-    selected_fonts = [fonts[key] for key in variant.font_keys]
-    widths = [
-        font.getlength(word)
-        for word, font in zip(TITLE_WORDS, selected_fonts)
-    ]
-    total_width = sum(widths) + CONFIG.title_space * (len(TITLE_WORDS) - 1)
-    current_x = (CONFIG.width - total_width) / 2
+    title_stroke_width = CONFIG.stroke_width
+    if variant.name == "sectra-only":
+        measurement_layer = Image.new("RGBA", (CONFIG.width, CONFIG.height))
+        measurement_draw = ImageDraw.Draw(measurement_layer)
+        title_text = " ".join(TITLE_WORDS)
+        for title_font_size in range(CONFIG.title_max_font_size, 9, -1):
+            title_stroke_width = max(
+                1,
+                round(title_font_size * CONFIG.stroke_width / CONFIG.title_font_size),
+            )
+            title_font = ImageFont.truetype(
+                str(FONT_PATHS["sectra"]),
+                title_font_size,
+            )
+            title_bbox = measurement_draw.textbbox(
+                (0, CONFIG.title_baseline_y),
+                title_text,
+                font=title_font,
+                stroke_width=title_stroke_width,
+                anchor="ls",
+            )
+            if (
+                title_bbox[2] - title_bbox[0]
+                <= CONFIG.width - 2 * CONFIG.title_safe_margin_x
+                and title_bbox[1] >= CONFIG.title_clear_top
+                and title_bbox[3] <= CONFIG.title_clear_bottom
+            ):
+                break
+        else:
+            raise ValueError("Sectra title cannot fit inside the configured safe area")
+        title_bbox_width = title_bbox[2] - title_bbox[0]
+        title_x = (CONFIG.width - title_bbox_width) / 2 - title_bbox[0]
+    else:
+        fonts = load_fonts()
+        selected_fonts = [fonts[key] for key in variant.font_keys]
 
     overlay = Image.new(
         "RGBA",
@@ -156,6 +186,25 @@ def render_title_overlay(
         fill=(0, 0, 0, 255),
     )
 
+    if variant.name == "sectra-only":
+        draw.text(
+            (title_x, CONFIG.title_baseline_y),
+            title_text,
+            font=title_font,
+            fill=(255, 255, 255),
+            stroke_width=title_stroke_width,
+            stroke_fill=(0, 0, 0),
+            anchor="ls",
+        )
+        overlay.save(output_path)
+        return
+
+    widths = [
+        font.getlength(word)
+        for word, font in zip(TITLE_WORDS, selected_fonts)
+    ]
+    total_width = sum(widths) + CONFIG.title_space * (len(TITLE_WORDS) - 1)
+    current_x = (CONFIG.width - total_width) / 2
     for word, font_key, font, width in zip(
         TITLE_WORDS,
         variant.font_keys,
@@ -170,7 +219,7 @@ def render_title_overlay(
                 word,
                 font=font,
                 fill=(255, 255, 255),
-                stroke_width=CONFIG.stroke_width,
+                stroke_width=title_stroke_width,
                 stroke_fill=(0, 0, 0),
                 anchor="ls",
             )
