@@ -1,0 +1,62 @@
+# Short du 2026-09-14 : harmonie du texel density global sur toute l'eglise
+
+Dossier de production : `/Users/zenray/Downloads/tmp-3D-houdini/`
+Format : 9:16 vertical, 2160x3840 (4K), 60 ips progressif, 30,00 secondes exactes.
+Titre du short : « Houdini Global Texel Density »
+Piste audio : normalisee a -14 LUFS, fondu in 0,5 s et out 0,8 s.
+
+Deux extraits, donc deux shorts :
+- Short 01 : toute la geometrie en mode damier UV, `debug_uv_all` actif, texel density global.
+- Short 02 : seul le materiau 04 reste en mode UV, le reste porte les materiaux complets.
+
+Parametres reels lus sur `/obj/Church` le 2026-09-14 : `texel_density = 1.0`,
+`debug_uv_checker`, `debug_uv_all`, `debug_uv_01` a `debug_uv_04`.
+
+## Les 10 cues du short en 2 lignes animees (30,00 secondes, 3,00 s par cue)
+
+| # | Temps | Ligne 1 | Ligne 2 |
+|---:|---|---|---|
+| 1 | 0,0 a 3,0s | Today I focused on UV texel harmony | across the whole church. |
+| 2 | 3,0 a 6,0s | The problem was simple: from one pattern | to the next, my UVs had no global harmony. |
+| 3 | 6,0 a 9,0s | So I took my height map, | which already gave me a clear pattern, |
+| 4 | 9,0 a 12,0s | and pushed it into the base color | just to get a proper debug view. |
+| 5 | 12,0 a 15,0s | Instead of patching things by hand, | I set one global texel density. |
+| 6 | 15,0 a 18,0s | Everything is computed properly now, | the whole building shares one scale. |
+| 7 | 18,0 a 21,0s | Any tiling texture can go on top, | and the parameters stay editable. |
+| 8 | 21,0 a 24,0s | Here is an extract of the UVs | directly on the geometry. |
+| 9 | 24,0 a 27,0s | Some details can still be improved, | the windows mostly, |
+| 10 | 27,0 a 30,0s | where a few UVs stay slightly stretched. | Second extract: full materials applied. |
+
+## Le post, trilingue
+
+🇬🇧 EN / 🇯🇵 日本語 / 🇫🇷 FR
+
+Today I focused on UV texel harmony across the whole church.
+
+The problem I had was simple: from one pattern to the next, my UVs had no global harmony. So I took my height map, which already gave me a clear pattern, and pushed it into the base color just to get a proper debug view. Then, instead of patching things by hand with compensation sliders, I simply set one global texel density and computed the whole thing properly, so that every part of the building shares the same scale. From there, any tiling texture can go on top and the parameters stay fully editable.
+
+Here is an extract of the UVs directly on the geometry, plus a second extract with the full materials applied. Some details can still be improved, the windows mostly, where a few UVs stay slightly stretched.
+
+thanks for reading, like for more! ᕙ(`▿´)ᕗ
+
+---
+
+今日は教会全体でUVのテクセル密度を揃えることに集中しました。
+
+問題はとても単純で、パターンごとにUVのスケールがばらばらで、全体としての統一感がありませんでした。そこでまず、すでにはっきりした模様が出ていたハイトマップをそのままベースカラーに流し込み、デバッグ用の表示として確認しました。そのあとは補正用のスライダーで手作業に辻褄を合わせるのではなく、グローバルなテクセル密度をひとつだけ設定し、計算をきちんとやり直しました。これで建物のどの部分も同じ基準で揃い、あとはタイリングするテクスチャを載せてパラメータを調整するだけで済みます。
+
+今回はジオメトリ上のUVの抜粋と、マテリアルを適用した状態の抜粋を載せています。窓まわりなど、まだ少し伸びているUVが残っているので、そこは引き続き直していきます。
+
+thanks for reading, like for more! ᕙ(`▿´)ᕗ
+
+---
+
+Aujourd'hui, je me suis concentré sur la création et l'harmonie du texel UV sur toute l'église.
+
+Le problème que j'avais était simple : d'un motif à l'autre, mes UV n'avaient aucune harmonie globale. J'ai donc utilisé ma height, qui me donnait déjà un motif lisible, et je l'ai mise dans la base color pour avoir un vrai debug. Ensuite, au lieu de faire du bricolage avec des curseurs de compensation, j'ai simplement posé un texel density global en calculant les choses proprement, pour que tout le bâtiment soit harmonisé sur la même échelle. Ce qui permet ensuite de mettre n'importe quelle texture qui se répète et de modifier les paramètres.
+
+Voici un extrait des UV sur la géo, plus un autre extrait où j'ai mis les matériaux complets. Quelques détails peuvent encore être améliorés, notamment les fenêtres, où certains UV restent légèrement étirés.
+
+thanks for reading, like for more! ᕙ(`▿´)ᕗ
+
+#houdini #uv #texeldensity #procedural #texturing #techart #3dmodeling
