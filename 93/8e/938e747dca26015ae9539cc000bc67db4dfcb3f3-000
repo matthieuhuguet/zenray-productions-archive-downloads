@@ -13,24 +13,24 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 
-# Updated 2026-09-14 13:34 CEST: Sectra-only auto-fits to the largest safe uncropped size.
+# Updated 2026-09-14 14:15 CEST: native 4K output with Sectra auto-fit.
 @dataclass(frozen=True)
 class RenderConfig:
     project_dir: Path = Path("/Users/zenray/Downloads/tmp-3D-houdini")
     input_video_name: str = "short-materials-layers.mp4"
-    width: int = 1080
-    height: int = 1920
+    width: int = 2160
+    height: int = 3840
     frame_rate: int = 60
-    title_font_size: int = 66
-    title_max_font_size: int = 200
-    title_safe_margin_x: int = 32
-    title_baseline_y: int = 330
-    title_space: int = 18
-    title_clear_top: int = 220
-    title_clear_bottom: int = 410
-    stroke_width: int = 4
+    title_font_size: int = 132
+    title_max_font_size: int = 400
+    title_safe_margin_x: int = 64
+    title_baseline_y: int = 660
+    title_space: int = 36
+    title_clear_top: int = 440
+    title_clear_bottom: int = 820
+    stroke_width: int = 8
     mono_shear: float = 0.22
-    video_bitrate: str = "12M"
+    video_bitrate: str = "45M"
 
     @property
     def input_video(self) -> Path:
@@ -100,11 +100,11 @@ def draw_slanted_mono_word(
 ) -> None:
     width = font.getlength(word)
     ascent, descent = font.getmetrics()
-    patch_width = int(width + 60)
-    patch_height = int(ascent + descent + 20)
+    patch_width = int(width + 120)
+    patch_height = int(ascent + descent + 40)
     patch = Image.new("RGBA", (patch_width, patch_height), (0, 0, 0, 0))
     patch_draw = ImageDraw.Draw(patch)
-    origin_x = 10
+    origin_x = 20
     patch_draw.text(
         (origin_x, ascent),
         word,
@@ -306,7 +306,7 @@ def render_variant(
             "-i",
             str(overlay_path),
             "-filter_complex",
-            "[0:v][1:v]overlay=0:0:eof_action=repeat:shortest=1[v]",
+            f"[0:v]scale={CONFIG.width}:{CONFIG.height}:flags=lanczos[base];[base][1:v]overlay=0:0:eof_action=repeat:shortest=1[v]",
             "-map",
             "[v]",
             "-map",
@@ -316,9 +316,9 @@ def render_variant(
             "-b:v",
             CONFIG.video_bitrate,
             "-maxrate",
-            "16M",
+            "55M",
             "-bufsize",
-            "24M",
+            "90M",
             "-pix_fmt",
             "yuv420p",
             "-tag:v",
