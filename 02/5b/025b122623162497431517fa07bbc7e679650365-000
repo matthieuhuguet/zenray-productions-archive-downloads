@@ -23,9 +23,9 @@ Parametres reels lus sur `/obj/Church` le 2026-09-14 : `texel_density = 1.0`,
 | 5 | 12,0 a 15,0s | Instead of patching things by hand, | I set one global texel density. |
 | 6 | 15,0 a 18,0s | Everything is computed properly now, | the whole building shares one scale. |
 | 7 | 18,0 a 21,0s | Any tiling texture can go on top, | and the parameters stay editable. |
-| 8 | 21,0 a 24,0s | Here is an extract of the UVs | directly on the geometry. |
-| 9 | 24,0 a 27,0s | Some details can still be improved, | the windows mostly, |
-| 10 | 27,0 a 30,0s | where a few UVs stay slightly stretched. | Second extract: full materials applied. |
+| 8 | 21,0 a 24,0s | Here is an extract of the UVs on the geo, | and a second one with the full materials. |
+| 9 | 24,0 a 27,0s | Some details can still be improved, the windows mostly, | where a few UVs stay slightly stretched. |
+| 10 | 27,0 a 30,0s | thanks for watching, follow, | like for more! ᕙ(`▿´)ᕗ |
 
 ## Le post, trilingue
 
@@ -37,7 +37,7 @@ The problem I had was simple: from one pattern to the next, my UVs had no global
 
 Here is an extract of the UVs directly on the geometry, plus a second extract with the full materials applied. Some details can still be improved, the windows mostly, where a few UVs stay slightly stretched.
 
-thanks for watching, follow, like for more! ᕙ(`▿´)ᕗ
+thanks for reading, like for more! ᕙ(`▿´)ᕗ
 
 ---
 
@@ -47,7 +47,7 @@ thanks for watching, follow, like for more! ᕙ(`▿´)ᕗ
 
 今回はジオメトリ上のUVの抜粋と、マテリアルを適用した状態の抜粋を載せています。窓まわりなど、まだ少し伸びているUVが残っているので、そこは引き続き直していきます。
 
-thanks for watching, follow, like for more! ᕙ(`▿´)ᕗ
+thanks for reading, like for more! ᕙ(`▿´)ᕗ
 
 ---
 
@@ -57,6 +57,6 @@ Le problème que j'avais était simple : d'un motif à l'autre, mes UV n'avaient
 
 Voici un extrait des UV sur la géo, plus un autre extrait où j'ai mis les matériaux complets. Quelques détails peuvent encore être améliorés, notamment les fenêtres, où certains UV restent légèrement étirés.
 
-thanks for watching, follow, like for more! ᕙ(`▿´)ᕗ
+thanks for reading, like for more! ᕙ(`▿´)ᕗ
 
 #houdini #uv #texeldensity #procedural #texturing #techart #3dmodeling
