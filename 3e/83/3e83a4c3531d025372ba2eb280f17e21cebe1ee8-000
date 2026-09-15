@@ -1,0 +1,388 @@
+"""4:5 4K shorts compositor (2026-09-15 era). Single input, 10 cues x 3 s.
+
+Variant of render_short_4k_compositor.py (9:16, frozen history) for the 4:5
+format ordered by Matthieu: 3072x3840 at 60 fps, 30.00 s exact. Same canon:
+Sectra Bold Italic white title with black stroke and NO capsule, two-line
+subtitles in line-by-line canon (line 2 at +0.67 s), punch curve, vivid
+yellow #f1f250. Kaomoji words route per character through the composite
+mono chain (AnthropicMono, EuphemiaCAS, Arial Unicode), coverage verified
+2026-09-15 by cmap probe: UCAS only in Euphemia, U+25BF only in Arial.
+
+FR : variante 4:5 du compositeur 9:16 (fichier d origine intouche, historique).
+Run with the shorts venv: ~/.venvs/shorts/bin/python <this file>
+"""
+import os
+import subprocess
+
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+
+
+def clean_chrome_bar(frame):
+    """Undo the translucent Rotate bar (uniform black veil, glyphs at left).
+
+    EN: rows 0..91 divided by BAR_ALPHA, edge row copied from below,
+    glyph columns repainted with the row sky median. FR : voile inverse,
+    ligne de bord recopiee, texte repeint au median du ciel.
+    """
+    f = frame.astype(np.float32)
+    band = f[0:BAR_FULL]
+    band /= BAR_ALPHA
+    ref = np.median(band[:, SKY_X0:SKY_X1, :], axis=1, keepdims=True)
+    band[:, 0:GLYPH_X1, :] = ref
+    f[BAR_FULL] = f[BAR_FULL + 1]
+    np.clip(f, 0, 255, out=f)
+    return f.astype(np.uint8)
+
+W, H = 3072, 3840
+FPS = 60
+TOTAL_FRAMES = 30 * FPS  # 1800 frames = 30.00 s exact
+
+SRC_MOV = '/Users/zenray/Downloads/tmp-3D-houdini/Shorts/2026-09-15 21-07-28.mov'
+OUT_DIR = '/Users/zenray/Downloads/tmp-3D-houdini/Shorts'
+OUT_MOV = os.path.join(OUT_DIR, '2026-09-15-churchyard-build-take2-4x5-4k.mov')
+OUT_MP4 = os.path.join(OUT_DIR, '2026-09-15-churchyard-build-take2-4x5-4k.mp4')
+THUMB_DIR = os.path.join(OUT_DIR, 'thumbnails')
+
+# Letterbox 4:5 (2026-09-15, ordre Matthieu) : le plan garde son format
+# d origine, cale en largeur sur fond noir. Viewport mesure au pixel sur la
+# source : x40..2460, y488..1786 (w2420 h1298). La barre Rotate (y488..580)
+# est un voile noir uniforme alpha 0.705 : on l inverse au lieu de couper,
+# car le clocher passe derriere. Bandes noires = titre dessus, sous-titres
+# dessous, JAMAIS de contour/stroke/capsule sur aucun texte.
+CROP = 'crop=2420:1298:40:488'
+CROP_W, CROP_H = 2420, 1298
+IMG_W, IMG_H, IMG_Y = 3072, 1648, 1096  # placed image geometry on the canvas
+BAR_ALPHA = 75.0 / 106.4  # measured on sky columns, flat rows 460..578
+BAR_FULL = 92   # crop-rel rows 0..91 fully tinted (source 488..579)
+GLYPH_X1 = 216  # crop-rel cols 0..215 repainted (Rotate text + gizmos)
+SKY_X0, SKY_X1 = 260, 560  # clean sky reference columns (crop-rel)
+
+font_dir = os.path.expanduser('~/Library/Fonts')
+sys_font_dir = '/System/Library/Fonts/Supplemental'
+p_sectra_bold_italic = os.path.join(font_dir, 'GT-Sectra-LCGV-Bold-Italic.otf')
+p_inter = os.path.join(font_dir, 'InterTight-Italic-VariableFont_wght.ttf')
+p_serif = os.path.join(font_dir, 'AnthropicSerif-SemiBoldItalic.ttf')
+p_mono = os.path.join(font_dir, 'AnthropicMono-Bold.ttf')
+p_euphemia = os.path.join(sys_font_dir, 'EuphemiaCAS.ttc')
+p_arialuni = os.path.join(sys_font_dir, 'Arial Unicode.ttf')
+
+YELLOW = (0xF1, 0xF2, 0x50)
+
+# 1. Master Title (sectra-only, auto-fit, no capsule ever)
+title_text = 'Houdini Churchyard Build'
+title_reference_font_size = 132
+title_reference_stroke_width = 8
+title_baseline_y = 1030
+title_safe_margin_x = 64
+title_safe_top = 640
+title_safe_bottom = 1090
+title_max_font_size = 400
+shear = 0.22
+
+title_layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+t_draw = ImageDraw.Draw(title_layer)
+
+for title_font_size in range(title_max_font_size, 9, -1):
+    title_stroke_width = 0  # letterbox : texte sur bande noire, jamais de contour
+    title_font = ImageFont.truetype(p_sectra_bold_italic, title_font_size)
+    title_bbox = t_draw.textbbox((0, title_baseline_y), title_text, font=title_font,
+                                 stroke_width=title_stroke_width, anchor='ls')
+    title_bbox_width = title_bbox[2] - title_bbox[0]
+    title_fits = (
+        title_bbox_width <= W - 2 * title_safe_margin_x
+        and title_bbox[1] >= title_safe_top
+        and title_bbox[3] <= title_safe_bottom
+    )
+    if title_fits:
+        title_tx = (W - title_bbox_width) / 2 - title_bbox[0]
+        break
+else:
+    raise ValueError('Sectra title cannot fit inside the configured safe area')
+t_draw.text((title_tx, title_baseline_y), title_text, font=title_font,
+            fill=(255, 255, 255), stroke_width=title_stroke_width,
+            stroke_fill=(0, 0, 0), anchor='ls')
+print('title size %d' % title_font_size, flush=True)
+
+# 2. Subtitles: 10 cues in 2 punchy lines, line-by-line canon animation
+cues_2lines = [
+    ['Today I continued modeling', 'new assets for the bayou.'],
+    ['I built the entrance arch,', 'then the fences around the field.'],
+    ['I had lost my grass assets,', 'but my site article saved me.'],
+    ['I rebuilt the whole grass system', 'from the article, step by step.'],
+    ['Then came the heightfield :', 'grass, fences and arch on it.'],
+    ['I placed the church I fully', 'remodeled, then set the camera.'],
+    ['I also pushed two wood layers', 'in Copernicus for the church.'],
+    ['One height layer must split', 'into many thin ones. Hard part.'],
+    ['Here is the yard with', 'the final camera move.'],
+    ['thanks for watching, follow,', 'like for more! \u1559(`\u25bf\u00b4)\u1557'],
+]
+
+MAX_W = 2673  # 0.87 of canvas width, same ratio as the 9:16 canon
+space_sub = 32
+c1 = (W // 2, 2850)
+c2 = (W // 2, 3040)
+subtitle_stroke_width = 0  # letterbox : texte sur bande noire, jamais de contour
+
+punch_curve = [
+    (0.50, 0.0),
+    (0.68, 0.4),
+    (0.85, 0.7),
+    (1.02, 1.0),
+    (1.14, 1.0),
+    (1.18, 1.0),  # peak punch
+    (1.16, 1.0),
+    (1.11, 1.0),
+    (1.05, 1.0),
+    (0.99, 1.0),
+    (0.96, 1.0),
+    (0.97, 1.0),
+    (0.99, 1.0),
+    (1.01, 1.0),
+    (1.00, 1.0),
+]
+
+# Kaomoji per-character routing (cmap probe 2026-09-15): UCAS in Euphemia only,
+# U+25BF in Arial Unicode only, ASCII in AnthropicMono.
+K_SPECIAL = {'\u1559': 'euph', '\u1557': 'euph', '\u25bf': 'arial'}
+
+
+def load_pool(font_size):
+    f_i = ImageFont.truetype(p_inter, font_size)
+    f_i.set_variation_by_axes([700])
+    f_s = ImageFont.truetype(p_serif, font_size)
+    f_m = ImageFont.truetype(p_mono, int(font_size * 0.92))
+    f_e = ImageFont.truetype(p_euphemia, font_size)
+    f_a = ImageFont.truetype(p_arialuni, font_size)
+    return [f_i, f_s, f_m], {'mono': f_m, 'euph': f_e, 'arial': f_a}
+
+
+def is_kaomoji_word(word):
+    return any(ord(ch) > 127 for ch in word)
+
+
+def kaomoji_width(word, faces):
+    total = 0.0
+    for ch in word:
+        face = faces[K_SPECIAL.get(ch, 'mono')]
+        total += face.getlength(ch)
+    return total
+
+
+def render_line_card(line, font_size, cue_idx, line_idx):
+    import random
+    pool, faces = load_pool(font_size)
+    rng = random.Random(cue_idx * 1337 + 42 + line_idx * 99)
+    last_idx = -1
+
+    words = line.split(' ')
+    w_fonts = []
+    is_mono = []
+    is_kao = []
+    widths = []
+    for w in words:
+        if is_kaomoji_word(w):
+            w_fonts.append(None)
+            is_mono.append(False)
+            is_kao.append(True)
+            widths.append(kaomoji_width(w, faces))
+            continue
+        choices = [i for i in range(len(pool)) if i != last_idx]
+        last_idx = rng.choice(choices)
+        chosen_font = pool[last_idx]
+        w_fonts.append(chosen_font)
+        is_mono.append(chosen_font == pool[2])
+        is_kao.append(False)
+        widths.append(chosen_font.getlength(w))
+
+    total_w = sum(widths) + space_sub * (len(words) - 1)
+    im_w = int(total_w + 80)
+    im_h = int(font_size * 1.5 + 60)
+
+    im = Image.new('RGBA', (im_w, im_h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+
+    cur_x = 40
+    base_y = int(font_size * 1.1 + 20)
+
+    for w, f, width, imono, kao in zip(words, w_fonts, widths, is_mono, is_kao):
+        if kao:
+            asc = max(faces[k].getmetrics()[0] for k in ('mono', 'euph', 'arial'))
+            x = cur_x
+            for ch in w:
+                face = faces[K_SPECIAL.get(ch, 'mono')]
+                a, _ = face.getmetrics()
+                d.text((x, base_y + (asc - a)), ch, font=face, fill=YELLOW,
+                       stroke_width=subtitle_stroke_width, stroke_fill=(0, 0, 0), anchor='ls')
+                x += face.getlength(ch)
+        elif imono:
+            asc, desc = f.getmetrics()
+            bw = int(width + 120)
+            bh = int(asc + desc + 60)
+            pp = Image.new('RGBA', (bw, bh), (0, 0, 0, 0))
+            pd = ImageDraw.Draw(pp)
+            mono_origin_x = 30
+            pd.text((mono_origin_x, asc), w, font=f, fill=YELLOW,
+                    stroke_width=subtitle_stroke_width, stroke_fill=(0, 0, 0), anchor='ls')
+            m = (1, shear, -shear * asc, 0, 1, 0)
+            sl = pp.transform((bw, bh), Image.AFFINE, m, resample=Image.BICUBIC)
+            im.paste(sl, (int(cur_x - mono_origin_x), int(base_y - asc)), sl)
+        else:
+            d.text((cur_x, base_y), w, font=f, fill=YELLOW,
+                   stroke_width=subtitle_stroke_width, stroke_fill=(0, 0, 0), anchor='ls')
+        cur_x += width + space_sub
+
+    return im, im_w, im_h
+
+
+def measure_line(line, font_size, cue_idx, line_idx):
+    import random
+    pool, faces = load_pool(font_size)
+    rng = random.Random(cue_idx * 1337 + 42 + line_idx * 99)
+    last_idx = -1
+    total = 0.0
+    for w in line.split(' '):
+        if is_kaomoji_word(w):
+            total += kaomoji_width(w, faces)
+            continue
+        choices = [i for i in range(len(pool)) if i != last_idx]
+        last_idx = rng.choice(choices)
+        total += pool[last_idx].getlength(w)
+    return total + space_sub * (len(line.split(' ')) - 1)
+
+
+# Pre-render cues for canon line-by-line
+rendered_cues = []
+for c_idx, cue in enumerate(cues_2lines):
+    best_size = 80
+    for test_size in range(124, 76, -1):
+        fits = True
+        for l_idx, line in enumerate(cue):
+            if measure_line(line, test_size, c_idx, l_idx) > MAX_W:
+                fits = False
+                break
+        if fits:
+            best_size = test_size
+            break
+
+    card_im1, card_w1, card_h1 = render_line_card(cue[0], best_size, c_idx, 0)
+    card_im2, card_w2, card_h2 = render_line_card(cue[1], best_size, c_idx, 1)
+
+    l1_frames = []
+    for s, a in punch_curve:
+        if a > 0.0:
+            sw = int(card_w1 * s)
+            sh = int(card_h1 * s)
+            res = card_im1.resize((sw, sh), Image.Resampling.BILINEAR)
+            if a < 1.0:
+                r, g, b, alpha_ch = res.split()
+                alpha_ch = alpha_ch.point(lambda p: int(p * a))
+                res = Image.merge('RGBA', (r, g, b, alpha_ch))
+            l1_frames.append((res, c1[0] - sw // 2, c1[1] - sh // 2))
+        else:
+            l1_frames.append(None)
+    l1_steady = (card_im1, c1[0] - card_w1 // 2, c1[1] - card_h1 // 2)
+
+    l2_frames = []
+    for s, a in punch_curve:
+        if a > 0.0:
+            sw = int(card_w2 * s)
+            sh = int(card_h2 * s)
+            res = card_im2.resize((sw, sh), Image.Resampling.BILINEAR)
+            if a < 1.0:
+                r, g, b, alpha_ch = res.split()
+                alpha_ch = alpha_ch.point(lambda p: int(p * a))
+                res = Image.merge('RGBA', (r, g, b, alpha_ch))
+            l2_frames.append((res, c2[0] - sw // 2, c2[1] - sh // 2))
+        else:
+            l2_frames.append(None)
+    l2_steady = (card_im2, c2[0] - card_w2 // 2, c2[1] - card_h2 // 2)
+
+    rendered_cues.append({
+        'l1_frames': l1_frames,
+        'l1_steady': l1_steady,
+        'l2_frames': l2_frames,
+        'l2_steady': l2_steady,
+    })
+    print('cue %d size %d' % (c_idx + 1, best_size), flush=True)
+
+# Video pipe: single input, 4:5 viewport crop, lanczos upscale, silent master
+seg_cmd = [
+    'ffmpeg', '-y', '-v', 'error',
+    '-i', SRC_MOV,
+    '-vf', f'fps=60,{CROP}',
+    '-pix_fmt', 'rgb24', '-f', 'rawvideo', 'pipe:1',
+]
+p_in = subprocess.Popen(seg_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+enc_cmd = [
+    'ffmpeg', '-y', '-v', 'error',
+    '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}', '-r', '60', '-i', 'pipe:0',
+    '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-pix_fmt', 'yuv420p',
+    '-frames:v', str(TOTAL_FRAMES),
+    OUT_MOV,
+]
+p_out = subprocess.Popen(enc_cmd, stdin=subprocess.PIPE)
+
+bytes_per_frame = CROP_W * CROP_H * 3
+canon_delay = 40  # 0.67 s delay for Line 2 canon pop
+
+print('Processing %d frames at native %dx%d, 30.00 s exact...' % (TOTAL_FRAMES, W, H), flush=True)
+
+for frame_idx in range(TOTAL_FRAMES):
+    raw = p_in.stdout.read(bytes_per_frame)
+    base_frame = Image.new('RGB', (W, H), (0, 0, 0))
+    if len(raw) >= bytes_per_frame:
+        crop = np.frombuffer(raw, dtype=np.uint8).reshape(CROP_H, CROP_W, 3)
+        placed = Image.fromarray(clean_chrome_bar(crop)).resize(
+            (IMG_W, IMG_H), Image.Resampling.LANCZOS)
+        base_frame.paste(placed, (0, IMG_Y))
+
+    base_frame.paste(title_layer, (0, 0), title_layer)
+
+    cue_idx = min(frame_idx // 180, len(rendered_cues) - 1)
+    f_rel = frame_idx % 180
+    cdata = rendered_cues[cue_idx]
+
+    if f_rel < len(cdata['l1_frames']):
+        part1 = cdata['l1_frames'][f_rel]
+    else:
+        part1 = cdata['l1_steady']
+    if part1 is not None:
+        im1, px1, py1 = part1
+        base_frame.paste(im1, (px1, py1), im1)
+
+    if f_rel >= canon_delay:
+        k = f_rel - canon_delay
+        if k < len(cdata['l2_frames']):
+            part2 = cdata['l2_frames'][k]
+        else:
+            part2 = cdata['l2_steady']
+        if part2 is not None:
+            im2, px2, py2 = part2
+            base_frame.paste(im2, (px2, py2), im2)
+
+    p_out.stdin.write(base_frame.tobytes())
+    if frame_idx % 300 == 0:
+        print('frame %d/%d' % (frame_idx, TOTAL_FRAMES), flush=True)
+
+p_out.stdin.close()
+p_out.wait()
+p_in.stdout.close()
+
+print('Encoding MP4...', flush=True)
+subprocess.run([
+    'ffmpeg', '-y', '-v', 'error', '-i', OUT_MOV,
+    '-c:v', 'copy', '-movflags', '+faststart', OUT_MP4,
+], check=True)
+
+print('Thumbnails...', flush=True)
+os.makedirs(THUMB_DIR, exist_ok=True)
+subprocess.run(['ffmpeg', '-y', '-v', 'error', '-ss', '00:00:16.5', '-i', OUT_MOV,
+                '-vframes', '1', '-q:v', '2',
+                os.path.join(THUMB_DIR, 'thumb-churchyard-take2-4x5-4k.jpg')], check=True)
+subprocess.run(['ffmpeg', '-y', '-v', 'error', '-ss', '00:00:16.5', '-i', OUT_MOV,
+                '-vframes', '1', '-vf', 'scale=1080:1350:flags=lanczos', '-q:v', '2',
+                os.path.join(THUMB_DIR, 'thumb-churchyard-take2-4x5-1080.jpg')], check=True)
+
+print('DONE', OUT_MOV, OUT_MP4, flush=True)
