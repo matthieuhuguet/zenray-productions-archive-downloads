@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+"""Recompute 4:5 4K and 1080p thumbnails with title 'Houdini' (GT Sectra Bold Italic).
+
+Fixes title overflow on vertical / player preview crops (e.g. 'udini Churchyard B').
+Updates both thumbs in Shorts/thumbnails and Shorts/29sec/thumbnails.
+"""
+import os
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+
+THUMB_DIR = '/Users/zenray/Downloads/tmp-3D-houdini/Shorts/thumbnails'
+THUMB_DIR_29 = '/Users/zenray/Downloads/tmp-3D-houdini/Shorts/29sec/thumbnails'
+os.makedirs(THUMB_DIR, exist_ok=True)
+os.makedirs(THUMB_DIR_29, exist_ok=True)
+
+font_path = os.path.expanduser('~/Library/Fonts/GT-Sectra-LCGV-Bold-Italic.otf')
+
+configs = [
+    {
+        'key': 'churchyard',
+        'file_4k': 'thumb-churchyard-4x5-4k.jpg',
+        'file_1080': 'thumb-churchyard-4x5-1080.jpg',
+        'split_y': 1085,
+        'baseline_y': 1000,
+        'safe_top': 620,
+        'safe_bottom': 1065,
+    },
+    {
+        'key': 'churchyard-take2',
+        'file_4k': 'thumb-churchyard-take2-4x5-4k.jpg',
+        'file_1080': 'thumb-churchyard-take2-4x5-1080.jpg',
+        'split_y': 1090,
+        'baseline_y': 1030,
+        'safe_top': 640,
+        'safe_bottom': 1090,
+    }
+]
+
+W, H = 3072, 3840
+title_text = 'Houdini'
+
+for cfg in configs:
+    src_4k = os.path.join(THUMB_DIR, cfg['file_4k'])
+    if not os.path.exists(src_4k):
+        print(f"Warning: {src_4k} not found, skipping")
+        continue
+
+    im = Image.open(src_4k).convert('RGB')
+    arr = np.array(im)
+    # Clear the top letterbox band completely to black
+    arr[:cfg['split_y'], :, :] = 0
+    im_4k = Image.fromarray(arr)
+
+    draw = ImageDraw.Draw(im_4k)
+    baseline_y = cfg['baseline_y']
+    safe_top = cfg['safe_top']
+    safe_bottom = cfg['safe_bottom']
+
+    # Auto-fit title_text = 'Houdini'
+    chosen_font = None
+    chosen_tx = 0
+    for size in range(400, 9, -1):
+        font = ImageFont.truetype(font_path, size)
+        bbox = draw.textbbox((0, baseline_y), title_text, font=font, anchor='ls')
+        bw = bbox[2] - bbox[0]
+        if bw <= W - 128 and bbox[1] >= safe_top and bbox[3] <= safe_bottom:
+            chosen_font = font
+            chosen_tx = (W - bw) / 2 - bbox[0]
+            break
+
+    draw.text((chosen_tx, baseline_y), title_text, font=chosen_font, fill=(255, 255, 255), anchor='ls')
+
+    # Save 4K
+    out_4k = os.path.join(THUMB_DIR, cfg['file_4k'])
+    im_4k.save(out_4k, quality=98, subsampling=0)
+    im_4k.save(os.path.join(THUMB_DIR_29, cfg['file_4k']), quality=98, subsampling=0)
+
+    # Scale & Save 1080
+    im_1080 = im_4k.resize((1080, 1350), Image.Resampling.LANCZOS)
+    out_1080 = os.path.join(THUMB_DIR, cfg['file_1080'])
+    im_1080.save(out_1080, quality=95)
+    im_1080.save(os.path.join(THUMB_DIR_29, cfg['file_1080']), quality=95)
+
+    print(f"Computed {cfg['key']}: 4K ({out_4k}) & 1080 ({out_1080}) with title '{title_text}' (font size {chosen_font.size})")
+
+print("All thumbnails recomputed successfully.")
