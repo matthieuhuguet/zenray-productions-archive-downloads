@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FOT-Chiaro Std — Complete 5-Weight Family Specimen & Test Sheet</title>
+  <title>FOT-Chiaro Std : Famille Complète 7 Graisses</title>
   <style>
     @font-face {
       font-family: 'FOT-Chiaro Std';
@@ -28,6 +28,13 @@
     }
     @font-face {
       font-family: 'FOT-Chiaro Std';
+      src: local('ChiaroStd-SB'), local('FOT-Chiaro Std SB'), url('file:///Users/zenray/Library/Fonts/FOT-ChiaroStd-SB.otf');
+      font-weight: 600;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'FOT-Chiaro Std';
       src: local('ChiaroStd-B'), local('FOT-Chiaro Std B'), url('file:///Users/zenray/Library/Fonts/FOT-ChiaroStd-B.otf');
       font-weight: 700;
       font-style: normal;
@@ -37,6 +44,13 @@
       font-family: 'FOT-Chiaro Std';
       src: local('ChiaroStd-EB'), local('FOT-Chiaro Std EB'), url('file:///Users/zenray/Library/Fonts/FOT-ChiaroStd-EB.otf');
       font-weight: 800;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'FOT-Chiaro Std';
+      src: local('ChiaroStd-H'), local('FOT-Chiaro Std H'), url('file:///Users/zenray/Library/Fonts/FOT-ChiaroStd-H.otf');
+      font-weight: 900;
       font-style: normal;
       font-display: swap;
     }
@@ -120,15 +134,15 @@
     h1 {
       font-family: var(--font-chiaro);
       font-weight: 700;
-      font-size: 44px;
+      font-size: 40px;
       letter-spacing: -0.02em;
       margin-bottom: 8px;
       color: #ffffff;
     }
     .subtitle {
       color: var(--text-muted);
-      font-size: 16px;
-      max-width: 860px;
+      font-size: 15px;
+      max-width: 900px;
     }
 
     .section-card {
@@ -202,10 +216,18 @@
       color: rgba(255, 255, 255, 0.85);
     }
 
+    .baseline-demo {
+      position: relative;
+      display: inline-block;
+      padding-bottom: 2px;
+      border-bottom: 2px solid #ff3b30;
+      margin-bottom: 8px;
+    }
+
     /* Live Interactive Tester */
     .tester-controls {
       display: flex;
-      gap: 12px;
+      gap: 10px;
       margin-bottom: 16px;
       flex-wrap: wrap;
     }
@@ -290,27 +312,30 @@
   <div class="container">
     <header>
       <div class="badge-row">
-        <span class="badge verified">✓ CoreText & NSFontManager 5/5</span>
+        <span class="badge verified">CoreText & NSFontManager 7/7 OK</span>
         <span class="badge gold">Master B (700) 100% Intact</span>
-        <span class="badge verified">Kanji & Kana Non Déformés</span>
-        <span class="badge source">Occidental Calibré (L · R · M · B · EB)</span>
+        <span class="badge verified">Baseline yMin=0.00 Ancré</span>
+        <span class="badge verified">Barre transversale A Solide</span>
+        <span class="badge source">L (300) · R (400) · M (500) · SB (600) · B (700) · EB (800) · H (900)</span>
       </div>
-      <h1>FOT-Chiaro Std — Famille Complète 5 Graisses</h1>
+      <h1>FOT-Chiaro Std : Famille Complète 7 Graisses</h1>
       <p class="subtitle">
-        Typothèque canonique Nintendo (Zelda Ocarina of Time / Majora's Mask). Master B original préservé octet pour octet. Calibrage procédural appliqué <strong>uniquement</strong> sur les caractères occidentaux (alphabet A-Z, a-z, nombres 0-9 et ponctuation), les 8 000+ kanji restant strictement identiques au master B original.
+        Typothèque canonique Nintendo (Zelda Ocarina of Time / Majora's Mask). Master B original préservé octet pour octet. Calibrage appliqué uniquement aux caractères occidentaux avec compensation affine exacte de la ligne de base (yMin = 0.00) et respect de la barre transversale du A. Les 8 000+ kanji et kana restent strictement identiques au master B.
       </p>
     </header>
 
     <div class="section-card">
-      <div class="section-title sec-orange">1. Les 5 Graisses de la Famille FOT-Chiaro Std</div>
+      <div class="section-title sec-orange">1. Les 7 Graisses de la Famille FOT-Chiaro Std</div>
 
       <!-- Light -->
       <div class="weight-row">
         <div class="weight-header">
           <span class="weight-tag" style="color: #58a6ff;">LIGHT (L · Poids 300)</span>
-          <span class="weight-desc">ChiaroStd-L · Décalage occidental -48 · Kanji originaux</span>
+          <span class="weight-desc">ChiaroStd-L · Décalage occidental -24 · Baseline yMin=0 · Barre A intacte</span>
         </div>
-        <div class="weight-sample-title" style="font-weight: 300;">Matthieu Huguet — The Legend of Zelda: Ocarina of Time (1997)</div>
+        <div class="weight-sample-title" style="font-weight: 300;">
+          <span class="baseline-demo">IAMHA Matthieu Huguet</span> : The Legend of Zelda (1997)
+        </div>
         <div class="weight-sample-sub" style="font-weight: 300;">時の勇者リンク / 0123456789 / abcdefghijklmnopqrstuvwxyz (e, a, t, g, m, u, o, s)</div>
       </div>
 
@@ -318,9 +343,11 @@
       <div class="weight-row">
         <div class="weight-header">
           <span class="weight-tag" style="color: #3fb950;">REGULAR (R · Poids 400)</span>
-          <span class="weight-desc">ChiaroStd-R · Décalage occidental -32 · Kanji originaux</span>
+          <span class="weight-desc">ChiaroStd-R · Décalage occidental -18 · Baseline yMin=0 · Barre A intacte</span>
         </div>
-        <div class="weight-sample-title" style="font-weight: 400;">Matthieu Huguet — The Legend of Zelda: Ocarina of Time (1997)</div>
+        <div class="weight-sample-title" style="font-weight: 400;">
+          <span class="baseline-demo">IAMHA Matthieu Huguet</span> : The Legend of Zelda (1997)
+        </div>
         <div class="weight-sample-sub" style="font-weight: 400;">時の勇者リンク / 0123456789 / abcdefghijklmnopqrstuvwxyz (e, a, t, g, m, u, o, s)</div>
       </div>
 
@@ -328,19 +355,35 @@
       <div class="weight-row">
         <div class="weight-header">
           <span class="weight-tag" style="color: #d29922;">MEDIUM (M · Poids 500)</span>
-          <span class="weight-desc">ChiaroStd-M · Décalage occidental -16 · Kanji originaux</span>
+          <span class="weight-desc">ChiaroStd-M · Décalage occidental -12 · Baseline yMin=0</span>
         </div>
-        <div class="weight-sample-title" style="font-weight: 500;">Matthieu Huguet — The Legend of Zelda: Ocarina of Time (1997)</div>
+        <div class="weight-sample-title" style="font-weight: 500;">
+          <span class="baseline-demo">IAMHA Matthieu Huguet</span> : The Legend of Zelda (1997)
+        </div>
         <div class="weight-sample-sub" style="font-weight: 500;">時の勇者リンク / 0123456789 / abcdefghijklmnopqrstuvwxyz (e, a, t, g, m, u, o, s)</div>
+      </div>
+
+      <!-- SemiBold -->
+      <div class="weight-row">
+        <div class="weight-header">
+          <span class="weight-tag" style="color: #e3b341;">SEMIBOLD (SB · Poids 600)</span>
+          <span class="weight-desc">ChiaroStd-SB · Décalage occidental -6 · Baseline yMin=0</span>
+        </div>
+        <div class="weight-sample-title" style="font-weight: 600;">
+          <span class="baseline-demo">IAMHA Matthieu Huguet</span> : The Legend of Zelda (1997)
+        </div>
+        <div class="weight-sample-sub" style="font-weight: 600;">時の勇者リンク / 0123456789 / abcdefghijklmnopqrstuvwxyz (e, a, t, g, m, u, o, s)</div>
       </div>
 
       <!-- Bold (Master) -->
       <div class="weight-row" style="border-color: rgba(240, 136, 62, 0.4); background: rgba(240, 136, 62, 0.05);">
         <div class="weight-header">
-          <span class="weight-tag" style="color: #f0883e;">BOLD (B · Poids 700) — MASTER ORIGINAL</span>
+          <span class="weight-tag" style="color: #f0883e;">BOLD (B · Poids 700) : MASTER ORIGINAL</span>
           <span class="weight-desc" style="color: #f0883e; font-weight: 700;">ChiaroStd-B · SOURCE ORIGINALE FONTWORKS · 100% INTACT</span>
         </div>
-        <div class="weight-sample-title" style="font-weight: 700;">Matthieu Huguet — The Legend of Zelda: Ocarina of Time (1997)</div>
+        <div class="weight-sample-title" style="font-weight: 700;">
+          <span class="baseline-demo">IAMHA Matthieu Huguet</span> : The Legend of Zelda (1997)
+        </div>
         <div class="weight-sample-sub" style="font-weight: 700;">時の勇者リンク / 0123456789 / abcdefghijklmnopqrstuvwxyz (e, a, t, g, m, u, o, s)</div>
       </div>
 
@@ -348,10 +391,24 @@
       <div class="weight-row">
         <div class="weight-header">
           <span class="weight-tag" style="color: #bc8cff;">EXTRABOLD (EB · Poids 800)</span>
-          <span class="weight-desc">ChiaroStd-EB · Renfort occidental +20 · Kanji originaux</span>
+          <span class="weight-desc">ChiaroStd-EB · Renfort occidental +18 · Baseline yMin=0</span>
         </div>
-        <div class="weight-sample-title" style="font-weight: 800;">Matthieu Huguet — The Legend of Zelda: Ocarina of Time (1997)</div>
+        <div class="weight-sample-title" style="font-weight: 800;">
+          <span class="baseline-demo">IAMHA Matthieu Huguet</span> : The Legend of Zelda (1997)
+        </div>
         <div class="weight-sample-sub" style="font-weight: 800;">時の勇者リンク / 0123456789 / abcdefghijklmnopqrstuvwxyz (e, a, t, g, m, u, o, s)</div>
+      </div>
+
+      <!-- Heavy -->
+      <div class="weight-row">
+        <div class="weight-header">
+          <span class="weight-tag" style="color: #d2a8ff;">HEAVY (H · Poids 900)</span>
+          <span class="weight-desc">ChiaroStd-H · Renfort occidental +32 · Baseline yMin=0</span>
+        </div>
+        <div class="weight-sample-title" style="font-weight: 900;">
+          <span class="baseline-demo">IAMHA Matthieu Huguet</span> : The Legend of Zelda (1997)
+        </div>
+        <div class="weight-sample-sub" style="font-weight: 900;">時の勇者リンク / 0123456789 / abcdefghijklmnopqrstuvwxyz (e, a, t, g, m, u, o, s)</div>
       </div>
     </div>
 
@@ -361,15 +418,17 @@
         <button class="weight-btn" data-weight="300">Light (300)</button>
         <button class="weight-btn" data-weight="400">Regular (400)</button>
         <button class="weight-btn" data-weight="500">Medium (500)</button>
+        <button class="weight-btn" data-weight="600">SemiBold (600)</button>
         <button class="weight-btn active" data-weight="700">Bold Master (700)</button>
         <button class="weight-btn" data-weight="800">ExtraBold (800)</button>
+        <button class="weight-btn" data-weight="900">Heavy (900)</button>
       </div>
-      <input type="text" class="interactive-input" id="testInput" value="Matthieu Huguet — ゼルダの伝説 時のオカリナ (1997)">
-      <div class="live-preview" id="testOutput" style="font-weight: 700;">Matthieu Huguet — ゼルダの伝説 時のオカリナ (1997)</div>
+      <input type="text" class="interactive-input" id="testInput" value="IAMHA Matthieu Huguet : ゼルダの伝説 時のオカリナ (1997)">
+      <div class="live-preview" id="testOutput" style="font-weight: 700;">IAMHA Matthieu Huguet : ゼルダの伝説 時のオカリナ (1997)</div>
     </div>
 
     <div class="section-card">
-      <div class="section-title sec-green">3. Preuve d'Intégrité des Kanji (Identité Parfaite B vs R)</div>
+      <div class="section-title sec-green">3. Preuve d'Intégrité des Kanji (Identité Parfaite B vs Autres)</div>
       <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 12px;">
         Vérification des kanji denses : aucun calcul d'amincissement ni d'épaississement n'a touché les kanji. Leurs contreformes intérieures et leurs traits complexes restent 100% identiques entre toutes les graisses.
       </p>
@@ -386,7 +445,7 @@
     </div>
 
     <footer>
-      ZENRAY FONTS · FOT-CHIARO STD 5-WEIGHT VERIFICATION REPORT · 9 NOVEMBER 2026
+      ZENRAY FONTS · FOT-CHIARO STD 7-WEIGHT VERIFICATION REPORT · 9 NOVEMBER 2026
     </footer>
   </div>
 
